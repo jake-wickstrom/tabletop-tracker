@@ -1,0 +1,7 @@
+- lay out high level vision for the project
+- create architectural plan for the project
+- track what tools are being used by the project
+- track what languages are being used by the project
+- track what frameworks are being used by the project
+
+[Features]
