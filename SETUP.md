@@ -1,119 +1,136 @@
-# Tabletop Tracker - Supabase Setup
+# Setup Guide - Resolving Common Issues
 
-This guide will help you set up the Supabase project for local development.
+This guide will help you resolve the startup issues and get the Tabletop Tracker app running properly.
 
-## Prerequisites
+## 🚨 Issue Resolution Steps
 
-- Node.js (v18 or higher)
-- npm or yarn
-- Docker (for local Supabase)
+### Step 1: Install Missing Dependencies
 
-## Initial Setup
+The main issue was that `@supabase/ssr` wasn't properly installed. Run:
 
-1. **Install dependencies:**
+```bash
+npm install @supabase/ssr
+```
+
+### Step 2: Verify Installation
+
+Check that all dependencies are installed correctly:
+
+```bash
+npm list @supabase/ssr
+npm list @supabase/supabase-js
+```
+
+### Step 3: Set Up Environment Variables
+
+1. Copy the example environment file:
    ```bash
-   npm install
+   cp .env.local.example .env.local
    ```
 
-2. **Create environment file:**
-   Create a `.env.local` file in the root directory with the following content:
+2. Edit `.env.local` and add your Supabase credentials:
    ```env
-   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-   SUPABASE_DB_PASSWORD=sCYpJbGUvszGq7YZ
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
-3. **Start Supabase locally:**
+   **To get these values:**
+   - Go to [Supabase Dashboard](https://app.supabase.com)
+   - Select your project
+   - Go to Settings → API
+   - Copy the Project URL and anon/public key
+
+### Step 4: Start Local Development
+
+1. **Start Supabase locally:**
    ```bash
    npm run supabase:start
    ```
 
-4. **Apply database migrations:**
-   ```bash
-   npm run db:push
-   ```
-
-5. **Seed the database (optional):**
+2. **Apply database migrations:**
    ```bash
    npm run db:reset
    ```
 
-## Database Schema
-
-The application includes the following tables:
-
-- **games**: Store information about board games
-- **players**: Store player information
-- **game_sessions**: Track individual game sessions
-- **session_players**: Many-to-many relationship between sessions and players
-- **game_results**: Store results for each player in a session
-
-## Available Scripts
-
-- `npm run supabase:start` - Start local Supabase instance
-- `npm run supabase:stop` - Stop local Supabase instance
-- `npm run supabase:status` - Check Supabase status
-- `npm run db:reset` - Reset database and apply migrations + seed data
-- `npm run db:push` - Apply migrations to database
-- `npm run db:diff` - Generate migration from schema changes
-
-## Local Development
-
-1. Start the Supabase instance:
+3. **Generate TypeScript types:**
    ```bash
-   npm run supabase:start
+   npm run types:generate
    ```
 
-2. Start the Next.js development server:
+4. **Start the development server:**
    ```bash
    npm run dev
    ```
 
-3. Access the applications:
-   - Next.js app: http://localhost:3000
-   - Supabase Studio: http://localhost:54323
-   - API: http://localhost:54321
+5. **Open your browser:**
+   Navigate to [http://localhost:3000](http://localhost:3000)
 
-## Database Management
+## ✅ Verification Checklist
 
-### Creating a new migration:
-```bash
-npx supabase migration new your_migration_name
-```
+- [ ] `@supabase/ssr` is installed
+- [ ] `.env.local` file exists with correct credentials
+- [ ] Supabase local instance is running
+- [ ] Database migrations are applied
+- [ ] TypeScript types are generated
+- [ ] Development server starts without errors
+- [ ] App loads in browser without module resolution errors
 
-### Applying migrations:
-```bash
-npm run db:push
-```
+## 🔧 Alternative: Using Remote Supabase
 
-### Resetting the database:
-```bash
-npm run db:reset
-```
+If you prefer to use a remote Supabase instance instead of local:
 
-## Environment Variables
+1. **Create a Supabase project:**
+   - Go to [Supabase](https://supabase.com)
+   - Create a new project
+   - Wait for it to be ready
 
-The following environment variables are required:
+2. **Get your credentials:**
+   - Go to Settings → API
+   - Copy the Project URL and anon key
 
-- `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase anonymous key
-- `SUPABASE_DB_PASSWORD`: Database password (for local development)
+3. **Update your `.env.local`:**
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
 
-## Troubleshooting
+4. **Apply migrations to remote:**
+   ```bash
+   npm run db:push
+   ```
 
-1. **Supabase won't start**: Make sure Docker is running
-2. **Database connection issues**: Check that the environment variables are set correctly
-3. **Migration errors**: Try resetting the database with `npm run db:reset`
+5. **Generate types from remote:**
+   ```bash
+   export PROJECT_REF="your-project-ref"
+   npm run types:generate:remote
+   ```
 
-## Project Structure
+## 🚨 Common Error Messages & Solutions
 
-```
-tabletop-tracker/
-├── supabase/           # Supabase configuration
-│   ├── migrations/     # Database migrations
-│   ├── seed/          # Seed data
-│   ├── functions/     # Edge functions
-│   └── config.toml    # Supabase configuration
-├── .env.example       # Example environment variables
-└── package.json       # Project dependencies and scripts
-``` 
+| Error | Solution |
+|-------|----------|
+| `Module not found: @supabase/ssr` | `npm install @supabase/ssr` |
+| `Your project's URL and API key are required` | Set up `.env.local` with correct credentials |
+| `Cannot connect to the Docker daemon` | Start Docker Desktop |
+| `Failed to inspect service` | Run `npm run supabase:start` |
+| Type errors | Run `npm run types:generate` |
+
+## 📞 Getting Help
+
+If you're still experiencing issues:
+
+1. Check the [AUTH_SETUP.md](./AUTH_SETUP.md) for detailed documentation
+2. Review the [README.md](./README.md) for general setup instructions
+3. Check [Supabase documentation](https://supabase.com/docs)
+4. Check [Next.js documentation](https://nextjs.org/docs)
+
+## 🎉 Success!
+
+Once you've completed these steps, you should have:
+- ✅ A working authentication system
+- ✅ Protected routes with middleware
+- ✅ Type-safe database operations
+- ✅ Row Level Security policies
+- ✅ Modern, responsive UI
+
+The app will redirect unauthenticated users to the sign-in page and authenticated users to the main dashboard. 
