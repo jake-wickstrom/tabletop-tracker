@@ -45,14 +45,20 @@ export function createRouteHandlerClient(request: Request) {
           return cookieStore
             .split(';')
             .map((cookie) => {
-              const [name, value] = cookie.trim().split('=')
+              const trimmedCookie = cookie.trim()
+              const firstEqualIndex = trimmedCookie.indexOf('=')
+              if (firstEqualIndex === -1) return { name: '', value: '' }
+              
+              const name = trimmedCookie.substring(0, firstEqualIndex)
+              const value = trimmedCookie.substring(firstEqualIndex + 1)
               return { name, value }
             })
             .filter(({ name }) => name)
         },
         setAll(cookiesToSet) {
-          // Implementation for setting cookies in route handlers
-          // This would typically be handled by the response
+          // In route handlers, cookies are typically set via response headers
+          // This method is called but we don't need to do anything here
+          // The actual cookie setting should be done in the route handler response
         },
       },
     }
