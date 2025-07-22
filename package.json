@@ -13,9 +13,12 @@
     "supabase:status": "npx supabase status",
     "db:reset": "npx supabase db reset",
     "db:push": "npx supabase db push",
-    "db:diff": "npx supabase db diff"
+    "db:diff": "npx supabase db diff",
+    "types:generate": "npx supabase gen types typescript --local > app/lib/database.types.ts",
+    "types:generate:remote": "npx supabase gen types typescript --project-id $PROJECT_REF --schema public > app/lib/database.types.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.39.0",
     "next": "^14.0.4",
     "react": "^18.0.0",

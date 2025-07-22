@@ -1,103 +1,144 @@
 # Tabletop Tracker
 
-Track board game plays, wins, losses and more! A modern web application built with Next.js and Supabase.
+Track board game plays, wins, losses and more!
 
-## Features
+## 🚀 Quick Start
 
-- 🎲 Track board games and their details
-- 👥 Manage players and their information
-- 📅 Record game sessions with dates and locations
-- 🏆 Store game results and scores
-- 📊 View statistics and history
-- 🎨 Modern, responsive UI with Tailwind CSS
+### Prerequisites
 
-## Tech Stack
+- Node.js 18+ 
+- Docker Desktop (for local Supabase)
+- Supabase CLI
 
-- **Frontend**: Next.js 14 (App Router), React 18, TypeScript
-- **Backend**: Supabase (PostgreSQL, Auth, Real-time)
-- **Styling**: Tailwind CSS
-- **Database**: PostgreSQL with Row Level Security
+### Installation
 
-## Quick Start
-
-1. **Install dependencies:**
+1. **Clone and install dependencies:**
    ```bash
+   git clone <repository-url>
+   cd tabletop-tracker
    npm install
    ```
 
 2. **Set up environment variables:**
-   Create a `.env.local` file with:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-   SUPABASE_DB_PASSWORD=sCYpJbGUvszGq7YZ
+   ```bash
+   # Copy the example environment file
+   cp .env.local.example .env.local
+   
+   # Edit .env.local with your Supabase credentials
+   # Get these from: https://supabase.com/dashboard/project/_/settings/api
    ```
 
-3. **Start Supabase locally:**
+3. **Start local Supabase and apply migrations:**
    ```bash
    npm run supabase:start
+   npm run db:reset
+   npm run types:generate
    ```
 
-4. **Apply database migrations:**
-   ```bash
-   npm run db:push
-   ```
-
-5. **Start the development server:**
+4. **Start the development server:**
    ```bash
    npm run dev
    ```
 
-6. **Open your browser:**
-   - App: http://localhost:3000
-   - Supabase Studio: http://localhost:54323
+5. **Open your browser:**
+   Navigate to [http://localhost:3000](http://localhost:3000)
 
-## Database Schema
-
-The application includes the following core tables:
-
-- **games**: Board game information (name, description, player count, etc.)
-- **players**: Player profiles and contact information
-- **game_sessions**: Individual game sessions with dates and locations
-- **session_players**: Many-to-many relationship between sessions and players
-- **game_results**: Detailed results for each player in a session
-
-## Available Scripts
+## 🔧 Available Scripts
 
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
 - `npm run start` - Start production server
-- `npm run supabase:start` - Start local Supabase
-- `npm run supabase:stop` - Stop local Supabase
-- `npm run db:reset` - Reset database with migrations and seed data
-- `npm run db:push` - Apply migrations to database
+- `npm run lint` - Run ESLint
 
-## Project Structure
+### Supabase Commands
+- `npm run supabase:start` - Start local Supabase instance
+- `npm run supabase:stop` - Stop local Supabase instance
+- `npm run supabase:status` - Check Supabase status
+- `npm run db:reset` - Reset and apply all migrations
+- `npm run db:push` - Push local migrations to remote
+- `npm run db:diff` - Generate migration diff
+
+### Type Generation
+- `npm run types:generate` - Generate types from local database
+- `npm run types:generate:remote` - Generate types from remote database
+
+## 📚 Documentation
+
+For detailed setup and usage instructions, see [AUTH_SETUP.md](./AUTH_SETUP.md).
+
+## 🛠️ Tech Stack
+
+- **Frontend:** Next.js 14, React 18, TypeScript
+- **Styling:** Tailwind CSS
+- **Backend:** Supabase (PostgreSQL, Auth, Real-time)
+- **Authentication:** Supabase Auth with Row Level Security
+- **Deployment:** Vercel (recommended)
+
+## 🔐 Authentication Features
+
+- ✅ User registration with email verification
+- ✅ User sign-in with email/password
+- ✅ Password reset functionality
+- ✅ Protected routes with middleware
+- ✅ Row Level Security (RLS) policies
+- ✅ Session management with automatic refresh
+- ✅ Type-safe database operations
+
+## 📁 Project Structure
 
 ```
-tabletop-tracker/
-├── app/                # Next.js App Router
-│   ├── components/     # React components
-│   ├── lib/           # Utility functions and configurations
-│   │   └── supabase.ts # Supabase client setup
-│   ├── globals.css    # Global styles
-│   ├── layout.tsx     # Root layout
-│   └── page.tsx       # Home page
-├── supabase/           # Supabase configuration
-│   ├── migrations/     # Database migrations
-│   ├── seed/          # Seed data
-│   └── functions/     # Edge functions
-└── public/            # Static assets
+app/
+├── lib/                    # Utility libraries
+│   ├── supabase.ts        # Server-side Supabase client
+│   ├── supabase-client.ts # Client-side Supabase client
+│   ├── database.types.ts  # Generated TypeScript types
+│   └── auth.ts            # Authentication utilities
+├── contexts/              # React contexts
+│   └── AuthContext.tsx    # Authentication state management
+├── components/            # Reusable components
+│   ├── Navigation.tsx     # Main navigation
+│   └── auth/              # Authentication components
+├── auth/                  # Authentication pages
+│   ├── page.tsx           # Sign in/up page
+│   └── reset-password/    # Password reset
+├── layout.tsx             # Root layout
+├── page.tsx               # Main dashboard
+└── middleware.ts          # Route protection
+
+supabase/
+└── migrations/            # Database migrations
 ```
 
-## Contributing
+## 🚨 Troubleshooting
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+### Common Issues
 
-## License
+1. **"Module not found: @supabase/ssr"**
+   ```bash
+   npm install @supabase/ssr
+   ```
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+2. **"Your project's URL and API key are required"**
+   - Ensure `.env.local` exists with correct Supabase credentials
+   - Check that environment variables are properly set
+
+3. **Database connection issues**
+   ```bash
+   npm run supabase:start
+   npm run db:reset
+   ```
+
+4. **Type errors**
+   ```bash
+   npm run types:generate
+   ```
+
+### Getting Help
+
+- Check the [AUTH_SETUP.md](./AUTH_SETUP.md) for detailed documentation
+- Review [Supabase documentation](https://supabase.com/docs)
+- Check [Next.js documentation](https://nextjs.org/docs)
+
+## 📄 License
+
+This project is licensed under the MIT License.
