@@ -50,6 +50,9 @@ npm run supabase:start
 
 # Apply migrations
 npm run db:reset
+
+# Generate TypeScript types from the database schema
+npm run types:generate
 ```
 
 **What the migrations do:**
@@ -57,6 +60,9 @@ npm run db:reset
 - Enable Row Level Security (RLS) on all tables
 - Create RLS policies to ensure users only see their own data
 - Add triggers to automatically set `user_id` on insert operations
+
+**Type Generation:**
+The project uses the Supabase CLI to automatically generate TypeScript types from the actual database schema. This ensures type safety and eliminates type mismatches between your code and database structure.
 
 ### 3. Supabase Auth Configuration
 
@@ -85,7 +91,9 @@ In your Supabase dashboard:
 ```
 app/
 ├── lib/
-│   ├── supabase.ts          # Supabase client configuration
+│   ├── supabase.ts          # Supabase server client configuration
+│   ├── supabase-client.ts   # Supabase browser client configuration
+│   ├── database.types.ts    # Generated TypeScript types from database schema
 │   └── auth.ts              # Authentication utility functions
 ├── contexts/
 │   └── AuthContext.tsx      # React context for auth state
@@ -93,7 +101,8 @@ app/
 │   ├── Navigation.tsx       # Navigation with auth state
 │   └── auth/
 │       ├── SignInForm.tsx   # Sign in form component
-│       └── SignUpForm.tsx   # Sign up form component
+│       ├── SignUpForm.tsx   # Sign up form component
+│       └── ForgotPasswordForm.tsx # Password reset form
 ├── auth/
 │   ├── page.tsx             # Main auth page (signin/signup)
 │   └── reset-password/
@@ -162,6 +171,63 @@ CREATE POLICY "Users can view their own games" ON games
 - Automatic session refresh
 - Proper logout clears all session data
 
+## TypeScript Type Management
+
+### Generating Types from Database Schema
+
+The project uses the Supabase CLI to automatically generate TypeScript types from your database schema, ensuring perfect type safety and eliminating manual type definitions.
+
+**For Local Development:**
+```bash
+# Generate types from local Supabase instance
+npm run types:generate
+```
+
+**For Production/Remote Database:**
+```bash
+# Set your project reference ID
+export PROJECT_REF="your-project-ref-id"
+npm run types:generate:remote
+```
+
+**When to Regenerate Types:**
+- After running database migrations
+- When adding new tables or columns
+- When modifying existing table structures
+- After updating Supabase functions or views
+
+**Benefits of Generated Types:**
+- ✅ Always in sync with actual database schema
+- ✅ Includes foreign key relationships
+- ✅ Proper nullable/non-nullable field definitions
+- ✅ Auto-completion in your IDE
+- ✅ Compile-time error checking
+- ✅ Includes database functions and views
+
+### Type Usage in Code
+
+```tsx
+import type { Database } from '@/lib/database.types'
+
+// Use specific table types
+type Game = Database['public']['Tables']['games']['Row']
+type GameInsert = Database['public']['Tables']['games']['Insert']
+type GameUpdate = Database['public']['Tables']['games']['Update']
+
+// Example function with proper typing
+async function createGame(gameData: GameInsert): Promise<Game | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('games')
+    .insert(gameData)
+    .select()
+    .single()
+  
+  if (error) throw error
+  return data
+}
+```
+
 ## Usage Examples
 
 ### Using Authentication in Components
@@ -186,26 +252,47 @@ export default function MyComponent() {
 }
 ```
 
-### Using Supabase Client
+### Using Supabase Client with Generated Types
 
 ```tsx
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase-client'
+import type { Database } from '@/lib/database.types'
+
+// Type aliases for convenience
+type Game = Database['public']['Tables']['games']['Row']
+type GameInsert = Database['public']['Tables']['games']['Insert']
 
 const supabase = createClient()
 
-// Insert data (user_id is automatically set)
+// Insert data with full type safety (user_id is automatically set)
+const gameData: GameInsert = {
+  name: 'Settlers of Catan',
+  min_players: 3,
+  max_players: 4,
+  description: 'A classic strategy game',
+  complexity_rating: 7
+}
+
 const { data, error } = await supabase
   .from('games')
-  .insert({
-    name: 'Settlers of Catan',
-    min_players: 3,
-    max_players: 4
-  })
+  .insert(gameData)
+  .select()
+  .single()
 
-// Query data (only user's data returned due to RLS)
-const { data: games } = await supabase
-  .from('games')
-  .select('*')
+if (error) throw error
+// data is now properly typed as Game
+
+// Query data with relationships (only user's data returned due to RLS)
+const { data: sessions } = await supabase
+  .from('game_sessions')
+  .select(`
+    *,
+    games(*),
+    session_players(*, players(*)),
+    game_results(*, players(*))
+  `)
+
+// All data is now properly typed including nested relationships
 ```
 
 ## Troubleshooting
