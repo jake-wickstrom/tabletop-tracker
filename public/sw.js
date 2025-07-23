@@ -2,8 +2,6 @@ const CACHE_NAME = 'tabletop-tracker-v1';
 const urlsToCache = [
   '/',
   '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png',
 ];
 
 // Install event - cache resources
@@ -47,31 +45,51 @@ self.addEventListener('fetch', (event) => {
 
 // Push event - handle push notifications
 self.addEventListener('push', (event) => {
+  let payload = {
+    title: 'Tabletop Tracker',
+    body: 'You have a new notification!',
+    icon: undefined,
+    badge: undefined
+  };
+
+  // Parse JSON payload if data exists
+  if (event.data) {
+    try {
+      payload = { ...payload, ...JSON.parse(event.data.text()) };
+    } catch (error) {
+      console.error('Error parsing push notification payload:', error);
+      // Fallback to plain text if JSON parsing fails
+      payload.body = event.data.text();
+    }
+  }
+
   const options = {
-    body: event.data ? event.data.text() : 'You have a new notification!',
-    icon: '/icon-192x192.png',
-    badge: '/badge.png',
+    body: payload.body,
+    icon: payload.icon,
+    badge: payload.badge,
+    tag: payload.tag,
     vibrate: [200, 100, 200],
     data: {
       dateOfArrival: Date.now(),
-      primaryKey: 1
+      primaryKey: 1,
+      ...payload.data
     },
     actions: [
       {
         action: 'explore',
         title: 'View',
-        icon: '/icon-192x192.png'
+        icon: payload.icon
       },
       {
         action: 'close',
         title: 'Close',
-        icon: '/icon-192x192.png'
+        icon: payload.icon
       }
     ]
   };
 
   event.waitUntil(
-    self.registration.showNotification('Tabletop Tracker', options)
+    self.registration.showNotification(payload.title || 'Tabletop Tracker', options)
   );
 });
 

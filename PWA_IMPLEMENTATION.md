@@ -204,7 +204,28 @@ npm start
 
 ---
 
-**Status**: ✅ **COMPLETED**  
+## 🐛 Bug Fixes Applied
+
+### Push Notification JSON Parsing Fix ✅
+- **Issue**: Service worker displayed raw JSON instead of intended message content
+- **Root Cause**: Service worker used `event.data.text()` directly for notification body, but server sends JSON-stringified payloads
+- **Solution**: Updated service worker to properly parse JSON payload and extract message fields
+- **Files Updated**: 
+  - `public/sw.js` - Added JSON parsing with error handling and fallback
+  - `app/actions.ts` - Removed icon references after icon file cleanup
+  - `app/pwa/page.tsx` - Updated test notification to not reference deleted icons
+  - `public/manifest.json` - Cleaned up icon references
+  - `app/layout.tsx` - Removed references to deleted icon files
+
+### Icon File Cleanup ✅ 
+- **Removed**: All placeholder PNG and SVG icon files from `/public/` directory
+- **Updated**: All references to use graceful fallbacks (undefined) instead of missing files
+- **Result**: App works without icons until proper branded assets are added
+
+---
+
+**Status**: ✅ **COMPLETED & BUG-FIXED**  
 **GitHub Issue**: [#5 - Setup Progressive Web App (PWA) functionality](https://github.com/jake-wickstrom/tabletop-tracker/issues/5)  
 **Implementation Date**: January 2025  
+**Bug Fix Date**: January 2025  
 **Next Steps**: Ready for production deployment and user testing
