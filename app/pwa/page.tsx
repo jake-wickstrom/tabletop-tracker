@@ -54,6 +54,8 @@ export default function PWATestPage() {
       const result = await sendNotification(pushSubscription, {
         title: 'Test Notification',
         body: 'This is a test notification from Tabletop Tracker!',
+        icon: '/icon-192x192.png',
+        badge: '/badge.png',
       })
 
       if (result.success) {

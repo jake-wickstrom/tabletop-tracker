@@ -2,6 +2,8 @@ const CACHE_NAME = 'tabletop-tracker-v1';
 const urlsToCache = [
   '/',
   '/manifest.json',
+  '/icon-192x192.png',
+  '/icon-512x512.png',
 ];
 
 // Install event - cache resources
@@ -48,8 +50,8 @@ self.addEventListener('push', (event) => {
   let payload = {
     title: 'Tabletop Tracker',
     body: 'You have a new notification!',
-    icon: undefined,
-    badge: undefined
+    icon: '/icon-192x192.png',
+    badge: '/badge.png'
   };
 
   // Parse JSON payload if data exists
@@ -65,8 +67,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: payload.body,
-    icon: payload.icon,
-    badge: payload.badge,
+    icon: payload.icon || '/icon-192x192.png',
+    badge: payload.badge || '/badge.png',
     tag: payload.tag,
     vibrate: [200, 100, 200],
     data: {
@@ -78,12 +80,12 @@ self.addEventListener('push', (event) => {
       {
         action: 'explore',
         title: 'View',
-        icon: payload.icon
+        icon: payload.icon || '/icon-192x192.png'
       },
       {
         action: 'close',
         title: 'Close',
-        icon: payload.icon
+        icon: payload.icon || '/icon-192x192.png'
       }
     ]
   };

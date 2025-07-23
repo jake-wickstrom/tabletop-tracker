@@ -32,6 +32,7 @@ export async function subscribeUser(subscription: PushSubscription) {
     await sendNotification(subscription, {
       title: 'Welcome to Tabletop Tracker!',
       body: 'You will now receive notifications about your games.',
+      icon: '/icon-192x192.png',
     })
     
     return { success: true }
