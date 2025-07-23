@@ -191,10 +191,11 @@ npm start
 
 ### Production Requirements
 1. Replace placeholder icons with branded assets
-2. Update VAPID email in actions.ts
-3. Ensure HTTPS is enabled (required for PWA)
-4. Configure database for subscription storage
-5. Set up proper monitoring and analytics
+2. ✅ VAPID email properly configured via environment variable
+3. ✅ VAPID keys secured with placeholder values in example file
+4. Ensure HTTPS is enabled (required for PWA)
+5. Configure database for subscription storage
+6. Set up proper monitoring and analytics
 
 ### Performance Considerations
 - Service worker caching improves load times
@@ -214,6 +215,15 @@ npm start
   - `public/sw.js` - Added JSON parsing with error handling and fallback
   - Icon references preserved in all files for future icon additions
 
+### VAPID Configuration Security Fixes ✅
+- **Issue 1**: Email placeholder hardcoded in VAPID configuration
+- **Root Cause**: `app/actions.ts` used hardcoded `mailto:your-email@example.com` instead of environment variable
+- **Solution**: Updated to use `process.env.VAPID_EMAIL` for proper configuration
+- **Issue 2**: Real VAPID keys exposed in example file
+- **Root Cause**: `.env.local.example` contained actual production VAPID keys instead of placeholders
+- **Solution**: Replaced with placeholder values and added generation instructions
+- **Security Impact**: Prevents accidental credential exposure in version control
+
 ### Icon File Cleanup ✅ 
 - **Removed**: All placeholder PNG and SVG icon files from `/public/` directory
 - **Kept**: All icon references in manifest.json, layout.tsx, and other files for future icon additions
@@ -221,8 +231,9 @@ npm start
 
 ---
 
-**Status**: ✅ **COMPLETED & BUG-FIXED**  
+**Status**: ✅ **COMPLETED & SECURITY-HARDENED**  
 **GitHub Issue**: [#5 - Setup Progressive Web App (PWA) functionality](https://github.com/jake-wickstrom/tabletop-tracker/issues/5)  
 **Implementation Date**: January 2025  
 **Bug Fix Date**: January 2025  
+**Security Fix Date**: January 2025  
 **Next Steps**: Ready for production deployment and user testing

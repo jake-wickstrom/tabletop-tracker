@@ -9,7 +9,7 @@ const vapidKeys = {
 }
 
 webpush.setVapidDetails(
-  'mailto:your-email@example.com', // Replace with your email
+  `mailto:${process.env.VAPID_EMAIL}`,
   vapidKeys.publicKey,
   vapidKeys.privateKey
 )
