@@ -1,5 +1,5 @@
 "use client"
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { Database } from '@nozbe/watermelondb'
 import { createDatabase } from '../lib/watermelon/db'
 import { runSync } from '../lib/watermelon/sync'
@@ -17,10 +17,15 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
   const [db, setDb] = useState<Database | undefined>(undefined)
   const [isSyncing, setIsSyncing] = useState<boolean>(false)
   const [lastCursor, setLastCursor] = useState<number | undefined>(undefined)
+  const lastCursorRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     setDb(createDatabase())
   }, [])
+
+  useEffect(() => {
+    lastCursorRef.current = lastCursor
+  }, [lastCursor])
 
   useEffect(() => {
     if (!db) return
@@ -33,7 +38,7 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
         const token = session?.access_token
         if (!token) return
         setIsSyncing(true)
-        const next = await runSync(currentDb, token, lastCursor)
+        const next = await runSync(currentDb, token, lastCursorRef.current)
         if (!cancelled) setLastCursor(next)
       } catch {
         // Silent retry on next run
@@ -50,7 +55,7 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
       cancelled = true
       window.removeEventListener('online', onlineHandler)
     }
-  }, [db, lastCursor])
+  }, [db])
 
   const value = useMemo<WatermelonContextValue>(() => ({ db, isSyncing, lastCursor }), [db, isSyncing, lastCursor])
 
