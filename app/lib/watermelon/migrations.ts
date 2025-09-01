@@ -1,11 +1,11 @@
 import { schemaMigrations } from '@nozbe/watermelondb/Schema/migrations'
 
-// Placeholder migrations. When bumping schema version beyond 2, add steps here.
+// Baseline is schema version 1 (no prior tables). Add steps when bumping to v2+.
 export const migrations = schemaMigrations({
   migrations: [
     // Example for future changes:
     // {
-    //   toVersion: 3,
+    //   toVersion: 2,
     //   steps: [
     //     addColumns({ table: 'games', columns: [{ name: 'foo', type: 'string' }] }),
     //   ],

@@ -47,7 +47,7 @@ WatermelonDB on web uses LokiJS for fast in-memory operations and persists to In
 import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
 export const schema = appSchema({
-  version: 2,
+  version: 1,
   tables: [
     tableSchema({
       name: 'games',
