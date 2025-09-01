@@ -27,13 +27,13 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
     let cancelled = false
     const supabase = createClient()
 
-    async function syncLoop() {
+    async function syncLoop(currentDb: Database) {
       try {
         const session = (await supabase.auth.getSession()).data.session
         const token = session?.access_token
         if (!token) return
         setIsSyncing(true)
-        const next = await runSync(db, token, lastCursor)
+        const next = await runSync(currentDb, token, lastCursor)
         if (!cancelled) setLastCursor(next)
       } catch {
         // Silent retry on next run
@@ -42,9 +42,9 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
       }
     }
 
-    syncLoop()
+    void syncLoop(db)
 
-    const onlineHandler = () => void syncLoop()
+    const onlineHandler = () => void syncLoop(db)
     window.addEventListener('online', onlineHandler)
     return () => {
       cancelled = true

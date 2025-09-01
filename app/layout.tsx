@@ -4,7 +4,7 @@ import './globals.css'
 import { AuthProvider } from './contexts/AuthContext'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/react'
-import WatermelonProvider from './components/Providers/WatermelonProvider'
+import WatermelonProvider from './components/providers/WatermelonProvider'
 import PushNotificationManager from './components/PushNotificationManager'
 import InstallPrompt from './components/InstallPrompt'
 

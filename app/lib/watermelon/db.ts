@@ -1,6 +1,5 @@
 import { Database } from '@nozbe/watermelondb'
 import { createLokiAdapter } from './adapter'
-import { schema } from './schema'
 
 // Centralized WatermelonDB database factory
 export function createDatabase(): Database {
@@ -8,7 +7,6 @@ export function createDatabase(): Database {
   return new Database({
     adapter,
     modelClasses: [],
-    actionsEnabled: true,
   })
 }
 

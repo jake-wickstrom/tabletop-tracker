@@ -1,15 +1,15 @@
-import { synchronize } from '@nozbe/watermelondb/sync'
+import { synchronize, type SyncDatabaseChangeSet, type SyncPullResult } from '@nozbe/watermelondb/sync'
 import type { Database } from '@nozbe/watermelondb'
 
 export type SyncResponse = {
-  changes: Record<string, unknown>
+  changes: SyncDatabaseChangeSet
   timestamp: number
 }
 
 export async function runSync(db: Database, authToken: string, cursor: number | undefined): Promise<number | undefined> {
-  const nextCursor = await synchronize({
+  await synchronize({
     database: db,
-    pullChanges: async ({ lastPulledAt }) => {
+    pullChanges: async ({ lastPulledAt }): Promise<SyncPullResult> => {
       const url = `/api/wm-sync?cursor=${encodeURIComponent(String(lastPulledAt ?? 0))}`
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${authToken}` },
@@ -32,7 +32,8 @@ export async function runSync(db: Database, authToken: string, cursor: number | 
     sendCreatedAsUpdated: true,
   })
 
-  return nextCursor ?? cursor
+  // For now, keep existing cursor until server returns a real timestamp
+  return cursor
 }
 
 
