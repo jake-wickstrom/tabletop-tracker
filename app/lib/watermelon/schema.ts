@@ -54,6 +54,8 @@ export const schema = appSchema({
         { name: 'player_id', type: 'string', isIndexed: true },
         { name: 'player_order', type: 'number' },
         { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+        { name: 'deleted_at', type: 'number', isOptional: true },
       ],
     }),
 
@@ -74,5 +76,3 @@ export const schema = appSchema({
     }),
   ],
 })
-
-
