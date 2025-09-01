@@ -61,7 +61,7 @@ export async function sendNotification(
     icon?: string
     badge?: string
     tag?: string
-    data?: any
+    data?: Record<string, unknown>
   }
 ) {
   try {
@@ -84,7 +84,7 @@ export async function sendNotificationToAll(
     icon?: string
     badge?: string
     tag?: string
-    data?: any
+    data?: Record<string, unknown>
   }
 ) {
   try {

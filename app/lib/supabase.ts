@@ -17,11 +17,9 @@ export async function createServerSupabaseClient() {
         getAll() {
           return cookieStore.getAll()
         },
-        setAll(cookiesToSet) {
+        setAll() {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
+            // No-op in Server Components context (middleware handles refresh)
           } catch {
             // The `setAll` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
@@ -55,7 +53,7 @@ export function createRouteHandlerClient(request: Request) {
             })
             .filter(({ name }) => name)
         },
-        setAll(cookiesToSet) {
+        setAll() {
           // In route handlers, cookies are typically set via response headers
           // This method is called but we don't need to do anything here
           // The actual cookie setting should be done in the route handler response
