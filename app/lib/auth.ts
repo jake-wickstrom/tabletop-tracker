@@ -3,9 +3,7 @@
 import { createClient } from './supabase-client'
 import { User } from '@supabase/supabase-js'
 
-export interface AuthUser extends User {
-  // Add any additional user properties if needed
-}
+export type AuthUser = User
 
 export interface SignUpData {
   email: string
@@ -110,7 +108,7 @@ export async function getCurrentUser(): Promise<AuthUser | undefined> {
   return user as AuthUser | undefined
 }
 
-export async function getSession() {
+export async function getSession(): Promise<import('@supabase/supabase-js').Session | null> {
   const supabase = createClient()
   
   const { data: { session }, error } = await supabase.auth.getSession()

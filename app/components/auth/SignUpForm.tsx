@@ -83,7 +83,7 @@ export default function SignUpForm({ onToggleMode }: SignUpFormProps) {
               Check Your Email
             </h2>
             <p className="text-gray-600 mb-6">
-              We've sent you a confirmation link at <strong>{formData.email}</strong>. 
+              We&apos;ve sent you a confirmation link at <strong>{formData.email}</strong>. 
               Please check your email and click the link to verify your account.
             </p>
             <button

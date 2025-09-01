@@ -25,7 +25,7 @@ WatermelonDB on web uses LokiJS for fast in-memory operations and persists to In
 
 1) Update schema
 - Edit `schema.ts` and add a `tableSchema` entry.
-- Bump the `version` number when changing schema.
+- Bump the `version` number when changing schema. Provide a WatermelonDB migration when changing schema in production. During early development, a reset may be acceptable.
 - Index query-heavy fields with `isIndexed: true`.
 - Prefer numbers for timestamps (epoch ms) on the client.
 

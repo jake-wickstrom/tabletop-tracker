@@ -46,7 +46,7 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
               Check Your Email
             </h2>
             <p className="text-gray-600 mb-6">
-              We've sent a password reset link to <strong>{email}</strong>. 
+              We&apos;ve sent a password reset link to <strong>{email}</strong>. 
               Please check your email and click the link to reset your password.
             </p>
             <button
@@ -69,7 +69,7 @@ export default function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) 
         </h2>
         
         <p className="text-gray-600 text-center mb-6">
-          Enter your email address and we'll send you a link to reset your password.
+          Enter your email address and we&apos;ll send you a link to reset your password.
         </p>
 
         {error && (
