@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import type { SyncDatabaseChangeSet } from '@nozbe/watermelondb/sync'
-import { buildChangeSet, epochMsToIso, splitPushChanges } from '@/app/lib/watermelon/transform'
+import { buildChangeSet, epochMsToIso, splitPushChanges, tableHasSoftDelete } from '@/app/lib/watermelon/transform'
 import type { TableName } from '@/app/lib/watermelon/transform'
 
 const TABLES: TableName[] = ['games', 'players', 'game_sessions', 'session_players', 'game_results']
-const TABLES_WITH_SOFT_DELETE: TableName[] = ['games', 'players', 'game_sessions', 'session_players', 'game_results']
 
 function getAuthToken(request: Request): string | undefined {
   const header = request.headers.get('authorization') || request.headers.get('Authorization')
@@ -75,7 +74,7 @@ export async function GET(request: Request) {
     }
 
     // deleted: ids where deleted_at > cursor
-    if (TABLES_WITH_SOFT_DELETE.includes(table)) {
+    if (tableHasSoftDelete(table)) {
       const { data } = await client
         .from(table)
         .select('id, deleted_at')
@@ -149,7 +148,7 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: 'read_failed', table, details: fetchError.message }, { status: 500 })
         }
 
-        if (existing && existing.updated_at && new Date(existing.updated_at as string).getTime() >= new Date(clientUpdatedIso).getTime()) {
+        if (existing && (existing as any).updated_at && new Date((existing as any).updated_at as string).getTime() >= new Date(clientUpdatedIso).getTime()) {
           if (!conflicts[table]) conflicts[table] = []
           conflicts[table]!.push(id)
         } else if (!existing) {
