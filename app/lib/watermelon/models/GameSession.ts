@@ -1,5 +1,5 @@
 import { Model, type Relation, type Query } from '@nozbe/watermelondb'
-import { children, date, field, relation, text } from '@nozbe/watermelondb/decorators'
+import { children, date, relation, text } from '@nozbe/watermelondb/decorators'
 import type { Game } from './Game'
 import type { SessionPlayer } from './SessionPlayer'
 import type { GameResult } from './GameResult'
@@ -7,7 +7,6 @@ import type { GameResult } from './GameResult'
 export class GameSession extends Model {
   static table = 'game_sessions'
 
-  @field('game_id') gameId!: string
   @relation('games', 'game_id') game!: Relation<Game>
   @text('session_date') sessionDate!: string
   @text('location') location: string | undefined

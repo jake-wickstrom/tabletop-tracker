@@ -1,6 +1,6 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
-// WatermelonDB schema v2 mirroring Supabase tables for offline sync
+// WatermelonDB schema v1 mirroring Supabase tables for offline sync
 export const schema = appSchema({
   version: 1,
   tables: [

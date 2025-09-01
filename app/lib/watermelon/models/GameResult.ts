@@ -6,9 +6,7 @@ import type { Player } from './Player'
 export class GameResult extends Model {
   static table = 'game_results'
 
-  @field('session_id') sessionId!: string
   @relation('game_sessions', 'session_id') session!: Relation<GameSession>
-  @field('player_id') playerId!: string
   @relation('players', 'player_id') player!: Relation<Player>
   @field('score') score!: number
   @field('position') position!: number

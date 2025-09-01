@@ -6,9 +6,7 @@ import type { Player } from './Player'
 export class SessionPlayer extends Model {
   static table = 'session_players'
 
-  @field('session_id') sessionId!: string
   @relation('game_sessions', 'session_id') session!: Relation<GameSession>
-  @field('player_id') playerId!: string
   @relation('players', 'player_id') player!: Relation<Player>
   @field('player_order') playerOrder!: number
   @date('created_at') createdAt!: number
