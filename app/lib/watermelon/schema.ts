@@ -2,7 +2,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
 // WatermelonDB schema v2 mirroring Supabase tables for offline sync
 export const schema = appSchema({
-  version: 2,
+  version: 1,
   tables: [
     // games
     tableSchema({
