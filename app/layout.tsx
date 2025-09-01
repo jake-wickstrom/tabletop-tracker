@@ -4,6 +4,7 @@ import './globals.css'
 import { AuthProvider } from './contexts/AuthContext'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Analytics } from '@vercel/analytics/react'
+import WatermelonProvider from './components/Providers/WatermelonProvider'
 import PushNotificationManager from './components/PushNotificationManager'
 import InstallPrompt from './components/InstallPrompt'
 
@@ -54,13 +55,15 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <AuthProvider>
-          {children}
-          <div className="fixed bottom-4 right-4 space-y-2">
-            <InstallPrompt />
-          </div>
-          <div className="hidden">
-            <PushNotificationManager />
-          </div>
+          <WatermelonProvider>
+            {children}
+            <div className="fixed bottom-4 right-4 space-y-2">
+              <InstallPrompt />
+            </div>
+            <div className="hidden">
+              <PushNotificationManager />
+            </div>
+          </WatermelonProvider>
         </AuthProvider>
         <SpeedInsights />
         <Analytics />
