@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import type { SyncDatabaseChangeSet } from '@nozbe/watermelondb/sync'
-
-type TableName = 'games' | 'players' | 'game_sessions' | 'session_players' | 'game_results'
+import { buildChangeSet, epochMsToIso, splitPushChanges } from '@/app/lib/watermelon/transform'
+import type { TableName } from '@/app/lib/watermelon/transform'
 
 const TABLES: TableName[] = ['games', 'players', 'game_sessions', 'session_players', 'game_results']
 const TABLES_WITH_SOFT_DELETE: TableName[] = ['games', 'players', 'game_sessions', 'session_players', 'game_results']
@@ -12,15 +12,6 @@ function getAuthToken(request: Request): string | undefined {
   if (!header) return undefined
   const parts = header.split(' ')
   if (parts.length === 2 && /^Bearer$/i.test(parts[0])) return parts[1]
-  return undefined
-}
-
-function epochMsToIso(epochMs: number): string {
-  return new Date(epochMs).toISOString()
-}
-
-function isoOrUndefined(epoch: unknown): string | undefined {
-  if (typeof epoch === 'number' && Number.isFinite(epoch)) return epochMsToIso(epoch)
   return undefined
 }
 
@@ -38,75 +29,6 @@ function createAuthedSupabaseClient(request: Request) {
   return { client, token }
 }
 
-function sanitizeRowForTable(table: TableName, row: Record<string, unknown>, serverNowMs: number) {
-  // Only allow known columns per table
-  const baseTimestamps = {
-    created_at: isoOrUndefined(row.created_at) ?? epochMsToIso(serverNowMs),
-    updated_at: isoOrUndefined(row.updated_at) ?? epochMsToIso(serverNowMs),
-  }
-  const softDelete = TABLES_WITH_SOFT_DELETE.includes(table)
-    ? { deleted_at: isoOrUndefined(row.deleted_at) }
-    : {}
-
-  switch (table) {
-    case 'games':
-      return {
-        id: row.id,
-        name: row.name,
-        description: row.description,
-        min_players: row.min_players,
-        max_players: row.max_players,
-        estimated_playtime_minutes: row.estimated_playtime_minutes,
-        complexity_rating: row.complexity_rating,
-        ...baseTimestamps,
-        ...softDelete,
-      }
-    case 'players':
-      return {
-        id: row.id,
-        name: row.name,
-        email: row.email,
-        ...baseTimestamps,
-        ...softDelete,
-      }
-    case 'game_sessions':
-      return {
-        id: row.id,
-        game_id: row.game_id,
-        session_date: row.session_date,
-        location: row.location,
-        notes: row.notes,
-        ...baseTimestamps,
-        ...softDelete,
-      }
-    case 'session_players':
-      return {
-        id: row.id,
-        session_id: row.session_id,
-        player_id: row.player_id,
-        player_order: row.player_order,
-        created_at: isoOrUndefined(row.created_at) ?? epochMsToIso(serverNowMs),
-        // updated_at may exist after migration; include if provided
-        updated_at: isoOrUndefined((row as any).updated_at) ?? epochMsToIso(serverNowMs),
-        ...(TABLES_WITH_SOFT_DELETE.includes('session_players')
-          ? { deleted_at: isoOrUndefined((row as any).deleted_at) }
-          : {}),
-      }
-    case 'game_results':
-      return {
-        id: row.id,
-        session_id: row.session_id,
-        player_id: row.player_id,
-        score: row.score,
-        position: row.position,
-        is_winner: row.is_winner,
-        notes: row.notes,
-        ...baseTimestamps,
-        ...softDelete,
-      }
-  }
-}
-
 // GET: Pull changes
 export async function GET(request: Request) {
   const { client, token } = createAuthedSupabaseClient(request)
@@ -118,13 +40,15 @@ export async function GET(request: Request) {
   const serverNowMs = Date.now()
   const sinceIso = epochMsToIso(last)
 
-  const changes: SyncDatabaseChangeSet = {}
+  const perTable: Record<TableName, { created: Record<string, unknown>[]; updated: Record<string, unknown>[]; deleted: string[] }> = {
+    games: { created: [], updated: [], deleted: [] },
+    players: { created: [], updated: [], deleted: [] },
+    game_sessions: { created: [], updated: [], deleted: [] },
+    session_players: { created: [], updated: [], deleted: [] },
+    game_results: { created: [], updated: [], deleted: [] },
+  }
 
   for (const table of TABLES) {
-    const created: any[] = []
-    const updated: any[] = []
-    const deleted: string[] = []
-
     // created: created_at > cursor and not soft-deleted
     {
       const createdQuery = client
@@ -134,9 +58,7 @@ export async function GET(request: Request) {
         .is('deleted_at', null)
         .limit(500)
       const { data } = await createdQuery
-      for (const row of data ?? []) {
-        created.push(row)
-      }
+      for (const row of data ?? []) perTable[table].created.push(row)
     }
 
     // updated: updated_at > cursor and created_at <= cursor and not soft-deleted
@@ -149,9 +71,7 @@ export async function GET(request: Request) {
         .is('deleted_at', null)
         .limit(500)
       const { data } = await updatedQuery
-      for (const row of data ?? []) {
-        updated.push(row)
-      }
+      for (const row of data ?? []) perTable[table].updated.push(row)
     }
 
     // deleted: ids where deleted_at > cursor
@@ -161,19 +81,11 @@ export async function GET(request: Request) {
         .select('id, deleted_at')
         .gt('deleted_at', sinceIso)
         .limit(500)
-      for (const row of data ?? []) {
-        deleted.push(row.id as string)
-      }
-    }
-
-    // Assign into WatermelonDB change set with sanitized rows
-    ;(changes as any)[table] = {
-      created: created.map((r) => sanitizeRowForTable(table, r, serverNowMs)),
-      updated: updated.map((r) => sanitizeRowForTable(table, r, serverNowMs)),
-      deleted,
+      for (const row of data ?? []) perTable[table].deleted.push(row.id as string)
     }
   }
 
+  const changes: SyncDatabaseChangeSet = buildChangeSet(perTable, serverNowMs)
   return NextResponse.json({ changes, timestamp: serverNowMs })
 }
 
@@ -190,48 +102,85 @@ export async function POST(request: Request) {
   }
 
   const serverNowMs = Date.now()
+  const { upserts, updates, deletes } = splitPushChanges(body.changes, serverNowMs)
 
+  const conflicts: Partial<Record<TableName, string[]>> = {}
+
+  // Created / Upserts
   for (const table of TABLES) {
-    const tableChanges = (body.changes as any)[table] as
-      | { created?: Record<string, unknown>[]; updated?: Record<string, unknown>[]; deleted?: string[] }
-      | undefined
-    if (!tableChanges) continue
-
-    const created = Array.isArray(tableChanges.created) ? tableChanges.created : []
-    const updated = Array.isArray(tableChanges.updated) ? tableChanges.updated : []
-    const deleted = Array.isArray(tableChanges.deleted) ? tableChanges.deleted : []
-
-    // Created: upsert with client-provided UUIDs, set timestamps to serverNow if missing
-    if (created.length > 0) {
-      const rows = created
-        .map((row) => sanitizeRowForTable(table, row, serverNowMs))
-        .filter((r) => r && typeof (r as any).id === 'string')
-      if (rows.length > 0) {
-        await client.from(table).upsert(rows, { onConflict: 'id' })
+    const toUpsert = upserts[table]
+    if (toUpsert && toUpsert.length > 0) {
+      const { error } = await client.from(table).upsert(toUpsert, { onConflict: 'id' })
+      if (error) {
+        return NextResponse.json({ error: 'upsert_failed', table, details: error.message }, { status: 500 })
       }
     }
+  }
 
-    // Updated: LWW - only apply if server.updated_at < client.updated_at
-    for (const row of updated) {
-      const sanitized = sanitizeRowForTable(table, row, serverNowMs) as any
-      const id = sanitized.id as string | undefined
-      const clientUpdatedIso = isoOrUndefined((row as any).updated_at) || epochMsToIso(serverNowMs)
-      if (!id) continue
+  // Updates with LWW
+  for (const table of TABLES) {
+    const toUpdate = updates[table]
+    if (!toUpdate || toUpdate.length === 0) continue
 
-      await client
+    for (const { id, row, clientUpdatedIso } of toUpdate) {
+      // conditional update; request returning rows to know if anything changed
+      const { data: updatedRows, error: updateError } = await client
         .from(table)
-        .update(sanitized)
+        .update(row)
         .eq('id', id)
         .lt('updated_at', clientUpdatedIso)
-    }
+        .select('id')
+        .limit(1)
 
-    // Deleted: soft-delete by setting deleted_at = serverNow
-    if (deleted.length > 0 && TABLES_WITH_SOFT_DELETE.includes(table)) {
-      await client
+      if (updateError) {
+        return NextResponse.json({ error: 'update_failed', table, details: updateError.message }, { status: 500 })
+      }
+
+      const updatedCount = (updatedRows?.length ?? 0)
+      if (updatedCount === 0) {
+        // no rows updated; detect conflict vs. missing
+        const { data: existing, error: fetchError } = await client
+          .from(table)
+          .select('id, updated_at')
+          .eq('id', id)
+          .maybeSingle()
+
+        if (fetchError) {
+          return NextResponse.json({ error: 'read_failed', table, details: fetchError.message }, { status: 500 })
+        }
+
+        if (existing && existing.updated_at && new Date(existing.updated_at as string).getTime() >= new Date(clientUpdatedIso).getTime()) {
+          if (!conflicts[table]) conflicts[table] = []
+          conflicts[table]!.push(id)
+        } else if (!existing) {
+          // record does not exist — create it to satisfy WMDB guidance
+          const { error: insertError } = await client.from(table).upsert([row], { onConflict: 'id' })
+          if (insertError) {
+            return NextResponse.json({ error: 'create_missing_failed', table, details: insertError.message }, { status: 500 })
+          }
+        }
+      }
+    }
+  }
+
+  // Soft deletes
+  for (const table of TABLES) {
+    const toDelete = deletes[table]
+    if (toDelete && toDelete.length > 0) {
+      const { error } = await client
         .from(table)
         .update({ deleted_at: epochMsToIso(serverNowMs) })
-        .in('id', deleted as string[])
+        .in('id', toDelete)
+      if (error) {
+        return NextResponse.json({ error: 'delete_failed', table, details: error.message }, { status: 500 })
+      }
     }
+  }
+
+  // If any conflicts detected, signal to client to pull again
+  const hasConflicts = Object.values(conflicts).some((ids) => (ids?.length ?? 0) > 0)
+  if (hasConflicts) {
+    return NextResponse.json({ error: 'conflict', conflicts }, { status: 409 })
   }
 
   return NextResponse.json({ ok: true })
