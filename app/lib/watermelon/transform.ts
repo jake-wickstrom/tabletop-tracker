@@ -3,16 +3,23 @@ import { schema } from './schema'
 
 export type TableName = string
 
-type WatermelonSchema = { tables: Array<{ name: string; columns: Array<{ name: string }> }> }
-const wmTables = (schema as unknown as WatermelonSchema).tables ?? []
-const TABLE_NAME_SET = new Set<string>(wmTables.map((t) => t.name))
+type WatermelonSchema = { tables: unknown }
+const wmTablesUnknown = (schema as unknown as WatermelonSchema).tables
+const KNOWN_TABLES = ['games', 'players', 'game_sessions', 'session_players', 'game_results'] as const
+const wmTablesArray: Array<{ name: string; columns?: Array<{ name: string }> }> = Array.isArray(wmTablesUnknown)
+  ? (wmTablesUnknown as Array<{ name: string; columns?: Array<{ name: string }> }>)
+  : []
+const tableNames: string[] = wmTablesArray.length > 0
+  ? wmTablesArray.map((t) => t.name)
+  : [...KNOWN_TABLES]
+const TABLE_NAME_SET = new Set<string>(tableNames)
 
 export function getTableNames(): string[] {
   return [...TABLE_NAME_SET]
 }
 
 const SOFT_DELETE_SET = new Set<TableName>(
-  wmTables
+  wmTablesArray
     .filter((t) => (t.columns || []).some((c) => c.name === 'deleted_at'))
     .map((t) => t.name as TableName)
 )
@@ -143,7 +150,7 @@ function getField<T = unknown>(row: RawRecord, key: string): T | undefined {
 }
 
 function allowedColumnsForTable(table: string): Set<string> {
-  const t = wmTables.find((wt) => wt.name === table)
+  const t = wmTablesArray.find((wt) => wt.name === table)
   const cols = new Set<string>(['id'])
   if (!t) return cols
   for (const c of (t.columns || [])) cols.add(c.name)
