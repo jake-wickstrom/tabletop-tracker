@@ -29,6 +29,14 @@ function createAuthedSupabaseClient(request: Request) {
   return { client, token }
 }
 
+function readUpdatedAtField(obj: unknown): string | undefined {
+  if (obj && typeof obj === 'object' && 'updated_at' in obj) {
+    const value = (obj as { updated_at?: unknown }).updated_at
+    return typeof value === 'string' ? value : undefined
+  }
+  return undefined
+}
+
 // GET: Pull changes
 export async function GET(request: Request) {
   const { client, token } = createAuthedSupabaseClient(request)
@@ -40,13 +48,10 @@ export async function GET(request: Request) {
   const serverNowMs = Date.now()
   const sinceIso = epochMsToIso(last)
 
-  const perTable: Record<TableName, { created: Record<string, unknown>[]; updated: Record<string, unknown>[]; deleted: string[] }> = {
-    games: { created: [], updated: [], deleted: [] },
-    players: { created: [], updated: [], deleted: [] },
-    game_sessions: { created: [], updated: [], deleted: [] },
-    session_players: { created: [], updated: [], deleted: [] },
-    game_results: { created: [], updated: [], deleted: [] },
-  }
+  const perTable: Record<TableName, { created: Record<string, unknown>[]; updated: Record<string, unknown>[]; deleted: string[] }> =
+    Object.fromEntries(
+      TABLES.map((t) => [t, { created: [], updated: [], deleted: [] as string[] }])
+    ) as Record<TableName, { created: Record<string, unknown>[]; updated: Record<string, unknown>[]; deleted: string[] }>
 
   for (const table of TABLES) {
     // created: created_at > cursor and not soft-deleted
@@ -149,7 +154,8 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: 'read_failed', table, details: fetchError.message }, { status: 500 })
         }
 
-        if (existing && (existing as any).updated_at && new Date((existing as any).updated_at as string).getTime() >= new Date(clientUpdatedIso).getTime()) {
+        const existingUpdatedAt = readUpdatedAtField(existing)
+        if (existing && existingUpdatedAt && new Date(existingUpdatedAt).getTime() >= new Date(clientUpdatedIso).getTime()) {
           if (!conflicts[table]) conflicts[table] = []
           conflicts[table]!.push(id)
         } else if (!existing) {
