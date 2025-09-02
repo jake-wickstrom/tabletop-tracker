@@ -1,10 +1,16 @@
 import type { SyncDatabaseChangeSet } from '@nozbe/watermelondb/sync'
 import { schema } from './schema'
 
-export type TableName = 'games' | 'players' | 'game_sessions' | 'session_players' | 'game_results'
+export type TableName = string
 
 type WatermelonSchema = { tables: Array<{ name: string; columns: Array<{ name: string }> }> }
 const wmTables = (schema as unknown as WatermelonSchema).tables ?? []
+const TABLE_NAME_SET = new Set<string>(wmTables.map((t) => t.name))
+
+export function getTableNames(): string[] {
+  return [...TABLE_NAME_SET]
+}
+
 const SOFT_DELETE_SET = new Set<TableName>(
   wmTables
     .filter((t) => (t.columns || []).some((c) => c.name === 'deleted_at'))
@@ -12,7 +18,7 @@ const SOFT_DELETE_SET = new Set<TableName>(
 )
 
 export function tableHasSoftDelete(table: TableName): boolean {
-  return SOFT_DELETE_SET.has(table)
+  return SOFT_DELETE_SET.has(table as TableName)
 }
 
 export function epochMsToIso(epochMs: number): string {
@@ -29,70 +35,22 @@ export function sanitizeRowForTable(
   row: Record<string, unknown>,
   serverNowMs: number
 ): Record<string, unknown> {
-  const baseTimestamps = {
-    created_at: isoFromEpoch(row.created_at) ?? epochMsToIso(serverNowMs),
-    updated_at: isoFromEpoch(row.updated_at) ?? epochMsToIso(serverNowMs),
+  // Whitelist only columns defined for the table in WM schema + id
+  const allowed = allowedColumnsForTable(table)
+  const out: Record<string, unknown> = {}
+  // Always accept id if provided
+  if (typeof row.id !== 'undefined') out.id = row.id
+  for (const col of allowed) {
+    if (col === 'id') continue
+    if (col in row) out[col] = (row as Record<string, unknown>)[col]
   }
-  const withSoftDelete = tableHasSoftDelete(table)
-    ? { deleted_at: isoFromEpoch(row.deleted_at) }
-    : {}
-
-  switch (table) {
-    case 'games':
-      return {
-        id: row.id,
-        name: row.name,
-        description: row.description,
-        min_players: row.min_players,
-        max_players: row.max_players,
-        estimated_playtime_minutes: row.estimated_playtime_minutes,
-        complexity_rating: row.complexity_rating,
-        ...baseTimestamps,
-        ...withSoftDelete,
-      }
-    case 'players':
-      return {
-        id: row.id,
-        name: row.name,
-        email: row.email,
-        ...baseTimestamps,
-        ...withSoftDelete,
-      }
-    case 'game_sessions':
-      return {
-        id: row.id,
-        game_id: row.game_id,
-        session_date: row.session_date,
-        location: row.location,
-        notes: row.notes,
-        ...baseTimestamps,
-        ...withSoftDelete,
-      }
-    case 'session_players':
-      return {
-        id: row.id,
-        session_id: row.session_id,
-        player_id: row.player_id,
-        player_order: row.player_order,
-        created_at: isoFromEpoch(row.created_at) ?? epochMsToIso(serverNowMs),
-        updated_at: isoFromEpoch(getField(row, 'updated_at')) ?? epochMsToIso(serverNowMs),
-        ...(tableHasSoftDelete('session_players')
-          ? { deleted_at: isoFromEpoch(getField(row, 'deleted_at')) }
-          : {}),
-      }
-    case 'game_results':
-      return {
-        id: row.id,
-        session_id: row.session_id,
-        player_id: row.player_id,
-        score: row.score,
-        position: row.position,
-        is_winner: row.is_winner,
-        notes: row.notes,
-        ...baseTimestamps,
-        ...withSoftDelete,
-      }
+  // Normalize timestamps
+  out.created_at = isoFromEpoch(row.created_at) ?? epochMsToIso(serverNowMs)
+  out.updated_at = isoFromEpoch(getField(row, 'updated_at')) ?? epochMsToIso(serverNowMs)
+  if (tableHasSoftDelete(table) && typeof getField(row, 'deleted_at') !== 'undefined') {
+    out.deleted_at = isoFromEpoch(getField(row, 'deleted_at'))
   }
+  return out
 }
 
 export function buildChangeSet(
@@ -103,7 +61,7 @@ export function buildChangeSet(
   serverNowMs: number
 ): SyncDatabaseChangeSet {
   const out: Record<string, { created: Record<string, unknown>[]; updated: Record<string, unknown>[]; deleted: string[] }> = {}
-  for (const table of Object.keys(tables) as TableName[]) {
+  for (const table of Object.keys(tables)) {
     const { created, updated, deleted } = tables[table]
     out[table] = {
       created: created.map((r) => sanitizeRowForTable(table, r, serverNowMs)),
@@ -130,7 +88,7 @@ export function splitPushChanges(
   const updates: PushOps['updates'] = {}
   const deletes: PushOps['deletes'] = {}
 
-  for (const table of Object.keys(changes) as TableName[]) {
+  for (const table of Object.keys(changes)) {
     const raw = (changes as unknown as Record<string, unknown>)[table]
     const obj = (raw && typeof raw === 'object') ? (raw as Record<string, unknown>) : undefined
 
@@ -143,13 +101,13 @@ export function splitPushChanges(
     const deletedIds = isStringArray(deletedUnknown) ? deletedUnknown : []
 
     if (created.length > 0) {
-      upserts[table] = created
+      upserts[table as TableName] = created
         .map((row) => sanitizeRowForTable(table, row, serverNowMs))
         .filter((r) => typeof r['id'] === 'string')
     }
 
     if (updatedRows.length > 0) {
-      updates[table] = updatedRows
+      updates[table as TableName] = updatedRows
         .map((row) => {
           const sanitized = sanitizeRowForTable(table, row, serverNowMs)
           const idVal = sanitized['id']
@@ -161,7 +119,7 @@ export function splitPushChanges(
     }
 
     if (deletedIds.length > 0) {
-      deletes[table] = deletedIds
+      deletes[table as TableName] = deletedIds
     }
   }
 
@@ -182,4 +140,16 @@ function isStringArray(val: unknown): val is string[] {
 function getField<T = unknown>(row: RawRecord, key: string): T | undefined {
   const value = row[key]
   return (value as T | undefined)
+}
+
+function allowedColumnsForTable(table: string): Set<string> {
+  const t = wmTables.find((wt) => wt.name === table)
+  const cols = new Set<string>(['id'])
+  if (!t) return cols
+  for (const c of (t.columns || [])) cols.add(c.name)
+  // Ensure timestamps are considered
+  cols.add('created_at')
+  cols.add('updated_at')
+  cols.add('deleted_at')
+  return cols
 }
