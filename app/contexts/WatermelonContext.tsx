@@ -5,6 +5,11 @@ import { createDatabase } from '../lib/watermelon/db'
 import { runSync } from '../lib/watermelon/sync'
 import { createClient } from '../lib/supabase-client'
 
+// Constants to avoid magic numbers/strings
+const LOCAL_STORAGE_CURSOR_KEY = 'wm_last_cursor'
+const BACKOFF_MIN_MS = 2000
+const BACKOFF_MAX_MS = 60000
+
 type WatermelonContextValue = {
   db: Database | undefined
   isSyncing: boolean
@@ -21,11 +26,12 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
   const [lastCursor, setLastCursor] = useState<number | undefined>(undefined)
   const [lastError, setLastError] = useState<string | undefined>(undefined)
   const lastCursorRef = useRef<number | undefined>(undefined)
-  const backoffMsRef = useRef<number>(2000)
+  const backoffMsRef = useRef<number>(BACKOFF_MIN_MS)
   const cancelRef = useRef<boolean>(false)
   const inFlightRef = useRef<boolean>(false)
   const retryTimeoutRef = useRef<number | undefined>(undefined)
   const performSyncRef = useRef<(() => void) | undefined>(undefined)
+  const supabaseRef = useRef(createClient())
 
   useEffect(() => {
     setDb(createDatabase())
@@ -38,19 +44,13 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (!db) return
     cancelRef.current = false
-    const supabase = createClient()
 
-    // Load persisted cursor on mount
-    try {
-      const persisted = localStorage.getItem('wm_last_cursor')
-      if (persisted) {
-        const parsed = Number(persisted)
-        if (Number.isFinite(parsed)) {
-          setLastCursor(parsed)
-          lastCursorRef.current = parsed
-        }
+    function scheduleRetry(cb: () => void) {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
       }
-    } catch {}
+      retryTimeoutRef.current = window.setTimeout(cb, backoffMsRef.current)
+    }
 
     async function performSync(currentDb: Database) {
       if (cancelRef.current) return
@@ -58,7 +58,7 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
       try {
         inFlightRef.current = true
         setLastError(undefined)
-        const session = (await supabase.auth.getSession()).data.session
+        const session = (await supabaseRef.current.auth.getSession()).data.session
         const token = session?.access_token
         if (!token) return
         setIsSyncing(true)
@@ -67,19 +67,14 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
         if (typeof next !== 'undefined') {
           setLastCursor(next)
           lastCursorRef.current = next
-          try { localStorage.setItem('wm_last_cursor', String(next)) } catch {}
+          try { localStorage.setItem(LOCAL_STORAGE_CURSOR_KEY, String(next)) } catch {}
         }
-        backoffMsRef.current = 2000
+        backoffMsRef.current = BACKOFF_MIN_MS
       } catch (err) {
         if (cancelRef.current) return
         setLastError(err instanceof Error ? err.message : 'Sync failed')
-        backoffMsRef.current = Math.min(backoffMsRef.current * 2, 60000)
-        if (retryTimeoutRef.current) {
-          clearTimeout(retryTimeoutRef.current)
-        }
-        retryTimeoutRef.current = window.setTimeout(() => {
-          if (!cancelRef.current) void performSync(currentDb)
-        }, backoffMsRef.current)
+        backoffMsRef.current = Math.min(backoffMsRef.current * 2, BACKOFF_MAX_MS)
+        scheduleRetry(() => { if (!cancelRef.current) void performSync(currentDb) })
       } finally {
         inFlightRef.current = false
         if (!cancelRef.current) setIsSyncing(false)
@@ -95,7 +90,7 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
     // Event triggers
     const onlineHandler = () => void performSync(db)
     const visibilityHandler = () => { if (document.visibilityState === 'visible') void performSync(db) }
-    const authSub = supabase.auth.onAuthStateChange(() => void performSync(db))
+    const authSub = supabaseRef.current.auth.onAuthStateChange(() => void performSync(db))
     window.addEventListener('online', onlineHandler)
     document.addEventListener('visibilitychange', visibilityHandler)
 
@@ -111,6 +106,20 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
       authSub.data.subscription.unsubscribe()
     }
   }, [db])
+
+  // Load persisted cursor early, separate from sync orchestration
+  useEffect(() => {
+    try {
+      const persisted = localStorage.getItem(LOCAL_STORAGE_CURSOR_KEY)
+      if (persisted) {
+        const parsed = Number(persisted)
+        if (Number.isFinite(parsed)) {
+          setLastCursor(parsed)
+          lastCursorRef.current = parsed
+        }
+      }
+    } catch {}
+  }, [])
 
   const setSyncRequested = useCallback(() => {
     if (performSyncRef.current) performSyncRef.current()
