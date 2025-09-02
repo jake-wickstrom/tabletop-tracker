@@ -1,5 +1,5 @@
 "use client"
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { Database } from '@nozbe/watermelondb'
 import { createDatabase } from '../lib/watermelon/db'
 import { runSync } from '../lib/watermelon/sync'
@@ -21,9 +21,11 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
   const [lastCursor, setLastCursor] = useState<number | undefined>(undefined)
   const [lastError, setLastError] = useState<string | undefined>(undefined)
   const lastCursorRef = useRef<number | undefined>(undefined)
-  const isSyncRequestedRef = useRef<boolean>(false)
   const backoffMsRef = useRef<number>(2000)
   const cancelRef = useRef<boolean>(false)
+  const inFlightRef = useRef<boolean>(false)
+  const retryTimeoutRef = useRef<number | undefined>(undefined)
+  const performSyncRef = useRef<(() => void) | undefined>(undefined)
 
   useEffect(() => {
     setDb(createDatabase())
@@ -51,7 +53,10 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
     } catch {}
 
     async function performSync(currentDb: Database) {
+      if (cancelRef.current) return
+      if (inFlightRef.current) return
       try {
+        inFlightRef.current = true
         setLastError(undefined)
         const session = (await supabase.auth.getSession()).data.session
         const token = session?.access_token
@@ -69,11 +74,20 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
         if (cancelRef.current) return
         setLastError(err instanceof Error ? err.message : 'Sync failed')
         backoffMsRef.current = Math.min(backoffMsRef.current * 2, 60000)
-        setTimeout(() => { if (!cancelRef.current) void performSync(currentDb) }, backoffMsRef.current)
+        if (retryTimeoutRef.current) {
+          clearTimeout(retryTimeoutRef.current)
+        }
+        retryTimeoutRef.current = window.setTimeout(() => {
+          if (!cancelRef.current) void performSync(currentDb)
+        }, backoffMsRef.current)
       } finally {
+        inFlightRef.current = false
         if (!cancelRef.current) setIsSyncing(false)
       }
     }
+
+    // Expose performSync to outside handlers via ref
+    performSyncRef.current = () => void performSync(db)
 
     // Initial run
     void performSync(db)
@@ -87,48 +101,24 @@ export function WatermelonProvider({ children }: { children: React.ReactNode }) 
 
     return () => {
       cancelRef.current = true
+      inFlightRef.current = false
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = undefined
+      }
       window.removeEventListener('online', onlineHandler)
       document.removeEventListener('visibilitychange', visibilityHandler)
       authSub.data.subscription.unsubscribe()
     }
   }, [db])
 
-  const setSyncRequested = () => {
-    isSyncRequestedRef.current = true
-    // Nudge retry immediately with zero-delay timeout
-    setTimeout(() => {
-      isSyncRequestedRef.current = false
-      // trigger via updating ref; actual sync will occur on events or next failure cycle
-      // directly call a sync attempt if db present
-      if (db) {
-        const supabase = createClient()
-        ;(async () => {
-          try {
-            const session = (await supabase.auth.getSession()).data.session
-            const token = session?.access_token
-            if (!token) return
-            setIsSyncing(true)
-            const next = await runSync(db, token, lastCursorRef.current)
-            if (typeof next !== 'undefined') {
-              setLastCursor(next)
-              lastCursorRef.current = next
-              try { localStorage.setItem('wm_last_cursor', String(next)) } catch {}
-            }
-            setLastError(undefined)
-            backoffMsRef.current = 2000
-          } catch (err) {
-            setLastError(err instanceof Error ? err.message : 'Sync failed')
-          } finally {
-            setIsSyncing(false)
-          }
-        })()
-      }
-    }, 0)
-  }
+  const setSyncRequested = useCallback(() => {
+    if (performSyncRef.current) performSyncRef.current()
+  }, [])
 
   const value = useMemo<WatermelonContextValue>(
     () => ({ db, isSyncing, lastCursor, lastError, setSyncRequested }),
-    [db, isSyncing, lastCursor, lastError]
+    [db, isSyncing, lastCursor, lastError, setSyncRequested]
   )
 
   return <WatermelonContext.Provider value={value}>{children}</WatermelonContext.Provider>
