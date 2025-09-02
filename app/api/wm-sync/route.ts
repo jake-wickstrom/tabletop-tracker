@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
 import type { SyncDatabaseChangeSet } from '@nozbe/watermelondb/sync'
-import { buildChangeSet, epochMsToIso, splitPushChanges, tableHasSoftDelete } from '@/app/lib/watermelon/transform'
+import { buildChangeSet, epochMsToIso, splitPushChanges, tableHasSoftDelete, getTableNames } from '@/app/lib/watermelon/transform'
 import type { TableName } from '@/app/lib/watermelon/transform'
 
-const TABLES: TableName[] = ['games', 'players', 'game_sessions', 'session_players', 'game_results']
+const TABLES: TableName[] = getTableNames()
+const PAGE_LIMIT = 500
 
 function getAuthToken(request: Request): string | undefined {
   const header = request.headers.get('authorization') || request.headers.get('Authorization')
@@ -50,25 +51,25 @@ export async function GET(request: Request) {
   for (const table of TABLES) {
     // created: created_at > cursor and not soft-deleted
     {
-      const createdQuery = client
-        .from(table)
-        .select('*')
-        .gt('created_at', sinceIso)
-        .is('deleted_at', null)
-        .limit(500)
+      let createdQuery = client.from(table).select('*').gt('created_at', sinceIso).limit(PAGE_LIMIT)
+      if (tableHasSoftDelete(table)) {
+        createdQuery = createdQuery.is('deleted_at', null)
+      }
       const { data } = await createdQuery
       for (const row of data ?? []) perTable[table].created.push(row)
     }
 
     // updated: updated_at > cursor and created_at <= cursor and not soft-deleted
     {
-      const updatedQuery = client
+      let updatedQuery = client
         .from(table)
         .select('*')
         .gt('updated_at', sinceIso)
         .lte('created_at', sinceIso)
-        .is('deleted_at', null)
-        .limit(500)
+        .limit(PAGE_LIMIT)
+      if (tableHasSoftDelete(table)) {
+        updatedQuery = updatedQuery.is('deleted_at', null)
+      }
       const { data } = await updatedQuery
       for (const row of data ?? []) perTable[table].updated.push(row)
     }
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
         .from(table)
         .select('id, deleted_at')
         .gt('deleted_at', sinceIso)
-        .limit(500)
+        .limit(PAGE_LIMIT)
       for (const row of data ?? []) perTable[table].deleted.push(row.id as string)
     }
   }
