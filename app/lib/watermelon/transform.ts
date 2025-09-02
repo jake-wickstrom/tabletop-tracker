@@ -1,19 +1,20 @@
-import type { SyncDatabaseChangeSet } from '@nozbe/watermelondb/sync'
+import type { TableSchema } from '@nozbe/watermelondb/Schema'
+import type { SyncDatabaseChangeSet, SyncTableChangeSet } from '@nozbe/watermelondb/sync'
 import { schema } from './schema'
 
 export type TableName = string
 
-type WatermelonSchema = { tables: Array<{ name: string; columns: Array<{ name: string }> }> }
-const wmTables = (schema as unknown as WatermelonSchema).tables ?? []
-const TABLE_NAME_SET = new Set<string>(wmTables.map((t) => t.name))
+const wmTablesMap = schema.tables
+const wmTableList: TableSchema[] = Object.values(wmTablesMap)
+const TABLE_NAME_SET = new Set<string>(Object.keys(wmTablesMap))
 
 export function getTableNames(): string[] {
   return [...TABLE_NAME_SET]
 }
 
 const SOFT_DELETE_SET = new Set<TableName>(
-  wmTables
-    .filter((t) => (t.columns || []).some((c) => c.name === 'deleted_at'))
+  wmTableList
+    .filter((t) => t.columnArray.some((c) => c.name === 'deleted_at'))
     .map((t) => t.name as TableName)
 )
 
@@ -88,17 +89,10 @@ export function splitPushChanges(
   const updates: PushOps['updates'] = {}
   const deletes: PushOps['deletes'] = {}
 
-  for (const table of Object.keys(changes)) {
-    const raw = (changes as unknown as Record<string, unknown>)[table]
-    const obj = (raw && typeof raw === 'object') ? (raw as Record<string, unknown>) : undefined
-
-    const createdUnknown = obj?.created
-    const updatedUnknown = obj?.updated
-    const deletedUnknown = obj?.deleted
-
-    const created = isRawRecordArray(createdUnknown) ? createdUnknown : []
-    const updatedRows = isRawRecordArray(updatedUnknown) ? updatedUnknown : []
-    const deletedIds = isStringArray(deletedUnknown) ? deletedUnknown : []
+  for (const [table, obj] of Object.entries(changes) as [string, SyncTableChangeSet][]) {
+    const created = Array.isArray(obj.created) ? obj.created : []
+    const updatedRows = Array.isArray(obj.updated) ? obj.updated : []
+    const deletedIds = Array.isArray(obj.deleted) ? obj.deleted : []
 
     if (created.length > 0) {
       upserts[table as TableName] = created
@@ -129,24 +123,16 @@ export function splitPushChanges(
 // Helpers
 type RawRecord = Record<string, unknown>
 
-function isRawRecordArray(val: unknown): val is RawRecord[] {
-  return Array.isArray(val) && val.every((v) => v !== null && typeof v === 'object' && !Array.isArray(v))
-}
-
-function isStringArray(val: unknown): val is string[] {
-  return Array.isArray(val) && val.every((v) => typeof v === 'string')
-}
-
 function getField<T = unknown>(row: RawRecord, key: string): T | undefined {
   const value = row[key]
   return (value as T | undefined)
 }
 
 function allowedColumnsForTable(table: string): Set<string> {
-  const t = wmTables.find((wt) => wt.name === table)
+  const t = wmTablesMap[table]
   const cols = new Set<string>(['id'])
   if (!t) return cols
-  for (const c of (t.columns || [])) cols.add(c.name)
+  for (const c of t.columnArray) cols.add(c.name)
   // Ensure timestamps are considered
   cols.add('created_at')
   cols.add('updated_at')

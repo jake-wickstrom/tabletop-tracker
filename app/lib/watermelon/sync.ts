@@ -7,6 +7,7 @@ export type SyncResponse = {
 }
 
 export async function runSync(db: Database, authToken: string, cursor: number | undefined): Promise<number | undefined> {
+  let serverTimestamp: number | undefined = undefined
   await synchronize({
     database: db,
     pullChanges: async ({ lastPulledAt }): Promise<SyncPullResult> => {
@@ -16,6 +17,7 @@ export async function runSync(db: Database, authToken: string, cursor: number | 
       })
       if (!res.ok) throw new Error('Failed to pull changes')
       const body = (await res.json()) as SyncResponse
+      serverTimestamp = body.timestamp
       return { changes: body.changes, timestamp: body.timestamp }
     },
     pushChanges: async ({ changes, lastPulledAt }) => {
@@ -32,8 +34,8 @@ export async function runSync(db: Database, authToken: string, cursor: number | 
     sendCreatedAsUpdated: true,
   })
 
-  // For now, keep existing cursor until server returns a real timestamp
-  return cursor
+  // Prefer server-provided timestamp when available; fall back to existing cursor
+  return typeof serverTimestamp === 'number' ? serverTimestamp : cursor
 }
 
 
