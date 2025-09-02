@@ -10,6 +10,7 @@ const TABLE_NAME_SET = new Set<string>(wmTables.map((t) => t.name))
 export function getTableNames(): string[] {
   return [...TABLE_NAME_SET]
 }
+
 const SOFT_DELETE_SET = new Set<TableName>(
   wmTables
     .filter((t) => (t.columns || []).some((c) => c.name === 'deleted_at'))
@@ -145,12 +146,10 @@ function allowedColumnsForTable(table: string): Set<string> {
   const t = wmTables.find((wt) => wt.name === table)
   const cols = new Set<string>(['id'])
   if (!t) return cols
-  for (const c of t.columns || []) cols.add(c.name)
+  for (const c of (t.columns || [])) cols.add(c.name)
   // Ensure timestamps are considered
   cols.add('created_at')
   cols.add('updated_at')
   cols.add('deleted_at')
   return cols
 }
-
-

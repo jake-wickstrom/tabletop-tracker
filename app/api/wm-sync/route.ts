@@ -42,13 +42,10 @@ export async function GET(request: Request) {
   const serverNowMs = Date.now()
   const sinceIso = epochMsToIso(last)
 
-  const perTable: Record<TableName, { created: Record<string, unknown>[]; updated: Record<string, unknown>[]; deleted: string[] }> = {
-    games: { created: [], updated: [], deleted: [] },
-    players: { created: [], updated: [], deleted: [] },
-    game_sessions: { created: [], updated: [], deleted: [] },
-    session_players: { created: [], updated: [], deleted: [] },
-    game_results: { created: [], updated: [], deleted: [] },
-  }
+  const perTable: Record<TableName, { created: Record<string, unknown>[]; updated: Record<string, unknown>[]; deleted: string[] }> =
+    Object.fromEntries(
+      TABLES.map((table) => [table, { created: [], updated: [], deleted: [] }])
+    ) as Record<TableName, { created: Record<string, unknown>[]; updated: Record<string, unknown>[]; deleted: string[] }>
 
   for (const table of TABLES) {
 
@@ -189,5 +186,3 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true })
 }
-
-

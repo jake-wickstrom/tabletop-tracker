@@ -20,5 +20,3 @@ CREATE INDEX IF NOT EXISTS idx_game_results_deleted_at ON game_results(deleted_a
 -- Trigger for updating updated_at on session_players
 CREATE TRIGGER update_session_players_updated_at BEFORE UPDATE ON session_players
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-
