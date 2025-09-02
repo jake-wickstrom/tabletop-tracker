@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server'
-import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
-import type { SyncDatabaseChangeSet } from '@nozbe/watermelondb/sync'
-import { buildChangeSet, epochMsToIso, splitPushChanges, tableHasSoftDelete, getTableNames } from '@/app/lib/watermelon/transform'
 import type { TableName } from '@/app/lib/watermelon/transform'
+import { buildChangeSet, epochMsToIso, getTableNames, splitPushChanges, tableHasSoftDelete } from '@/app/lib/watermelon/transform'
+import type { SyncDatabaseChangeSet } from '@nozbe/watermelondb/sync'
+import { createClient as createSupabaseJsClient } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server'
 
 const TABLES: TableName[] = getTableNames()
 const PAGE_LIMIT = 500
@@ -29,13 +29,7 @@ function createAuthedSupabaseClient(request: Request) {
   return { client, token }
 }
 
-function readUpdatedAtField(obj: unknown): string | undefined {
-  if (obj && typeof obj === 'object' && 'updated_at' in obj) {
-    const value = (obj as { updated_at?: unknown }).updated_at
-    return typeof value === 'string' ? value : undefined
-  }
-  return undefined
-}
+// Row sanitization and conversions are implemented in the transformer module
 
 // GET: Pull changes
 export async function GET(request: Request) {
@@ -50,10 +44,11 @@ export async function GET(request: Request) {
 
   const perTable: Record<TableName, { created: Record<string, unknown>[]; updated: Record<string, unknown>[]; deleted: string[] }> =
     Object.fromEntries(
-      TABLES.map((t) => [t, { created: [], updated: [], deleted: [] as string[] }])
+      TABLES.map((table) => [table, { created: [], updated: [], deleted: [] }])
     ) as Record<TableName, { created: Record<string, unknown>[]; updated: Record<string, unknown>[]; deleted: string[] }>
 
   for (const table of TABLES) {
+
     // created: created_at > cursor and not soft-deleted
     {
       let createdQuery = client.from(table).select('*').gt('created_at', sinceIso).limit(PAGE_LIMIT)
@@ -88,8 +83,9 @@ export async function GET(request: Request) {
         .limit(PAGE_LIMIT)
       for (const row of data ?? []) perTable[table].deleted.push(row.id as string)
     }
-  }
 
+    // loop continues to build perTable; changes constructed after loop
+  }
   const changes: SyncDatabaseChangeSet = buildChangeSet(perTable, serverNowMs)
   return NextResponse.json({ changes, timestamp: serverNowMs })
 }
@@ -154,8 +150,7 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: 'read_failed', table, details: fetchError.message }, { status: 500 })
         }
 
-        const existingUpdatedAt = readUpdatedAtField(existing)
-        if (existing && existingUpdatedAt && new Date(existingUpdatedAt).getTime() >= new Date(clientUpdatedIso).getTime()) {
+        if (existing && existing.updated_at && new Date(existing.updated_at as string).getTime() >= new Date(clientUpdatedIso).getTime()) {
           if (!conflicts[table]) conflicts[table] = []
           conflicts[table]!.push(id)
         } else if (!existing) {
